@@ -104,7 +104,7 @@ COUNT(rate) change_to_high
 FROM (
     SELECT
         *,
-        lag(rate) over(PARTITION by subscriber_id order by effective_date asc) prev_rate
+        LAG(rate) OVER(PARTITION BY subscriber_id ORDER BY effective_date ASC) prev_rate
     FROM fct_subscriptions
     ) f1
 WHERE rate > prev_rate
@@ -123,25 +123,25 @@ LIMIT 1;
 -- QUESTION 6: How many new customers have been added on 2018-12-12? How many existing customers renewed their subscriptions on 2018-12-12?
 -- ANSWER: On 2018-12-12 there were 3 new customers and 0 customers renewed subscriptions
 SELECT
-count(1) new_customers
+    COUNT(1) new_customers
 FROM (
     SELECT
         *,
-        dense_rank() over(PARTITION by subscriber_id) rank
+        DENSE_RANK() OVER(PARTITION BY subscriber_id) rank
     FROM fct_subscriptions
     ) f1
-WHERE DATE(effective_date) = '2018-12-12' and f1.rank = 1;
+WHERE DATE(effective_date) = '2018-12-12' AND f1.rank = 1;
 
 
 SELECT
-count(1) renewal_customers
+    COUNT(1) renewal_customers
 FROM (
     SELECT
         *,
-        dense_rank() over(PARTITION by subscriber_id) rank
+        DENSE_RANK() OVER(PARTITION BY subscriber_id) rank
     FROM fct_subscriptions
     ) f1
-WHERE DATE(effective_date) = '2018-12-12' and f1.rank > 1;
+WHERE DATE(effective_date) = '2018-12-12' AND f1.rank > 1;
 
 -- QUESTION 7: Every week of every year lists the most expensive subscription, its number, segment, and rate.
 -- ANSWER:
@@ -153,9 +153,9 @@ SELECT
     f1.segment
 FROM (
     SELECT
-        to_char(DATE(f.effective_date), 'yyyy') year_num,
-        to_char(DATE(f.effective_date), 'w') week,
-        max(f.rate) rate, d.product_segment segment
+        TO_CHAR(DATE(f.effective_date), 'yyyy') year_num,
+        TO_CHAR(DATE(f.effective_date), 'w') week,
+        MAX(f.rate) rate, d.product_segment segment
     FROM fct_subscriptions f
     JOIN dim_priceplans d
     ON f.soc_pp_code = d.soc_pp_code
@@ -168,7 +168,7 @@ WHERE rate = (
         MAX(rate)
     FROM (
         SELECT
-            to_char(DATE(f.effective_date), 'w') week,
+            TO_CHAR(DATE(f.effective_date), 'w') week,
             f.rate rate
         FROM fct_subscriptions f
         JOIN dim_priceplans d
