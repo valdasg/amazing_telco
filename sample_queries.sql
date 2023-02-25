@@ -75,22 +75,36 @@ FROM fct_subscriptions;
 ---------------------------------------------------------------------------
 
 -- QUESTION 1: How many plans do we have?
+
+-- Count the plans from dim_piceplans table
 -- ANSWER 80
+
 SELECT COUNT(1) plan_count
 FROM dim_priceplans;
 
 -- QUESTION 2: What segment does the most expensive subscription belong to?
+
+-- Join tables to include all subscription records
+-- Ignore NULL subscriptions/rates
+-- Order desceding and take the most expensive one and display alonf with segment
+
 -- ANSWER: Business segment, rate 1061.25
+
 SELECT d.product_segment, f.rate
 FROM fct_subscriptions f
-JOIN dim_priceplans d
+LEFT JOIN dim_priceplans d
 ON f.soc_pp_code = d.soc_pp_code
+-- ignore NULL subscription rate
 WHERE f.rate is not NULL
 ORDER BY f.rate DESC
 LIMIT 1;
 
 -- QUESTION 3: How much does the most popular subscription cost?
+
+-- count subscribers of most popular rate
+
 -- ANSWER: Most popular subscription with rate of 299.00, with 229 subscribers
+
 SELECT count(rate) count_of_subscribers, rate most_pop_sub_rate
 FROM fct_subscriptions
 GROUP BY rate
@@ -98,7 +112,12 @@ ORDER BY count(rate) DESC
 LIMIT 1;
 
 -- QUESTION 4: How many times did customers switch from a less expensive to a more expensive subscription?
+
+-- create window function to have a field of subscriber partitions ordered by date - have a lagging previuos plan chnage date 
+-- count lines where current rate is higher than previuos rate
+
 -- ANSWER: Customers switched 109 times
+
 SELECT
 COUNT(rate) change_to_high
 FROM (
@@ -110,7 +129,13 @@ FROM (
 WHERE rate > prev_rate
 
 -- QUESTION 5: Which week of which year did the majority of subscriptions expire?
+
+-- extract year and date
+-- group by both and order
+-- count expiration_dates and order descending to have majority value
+
 -- ANSWER: Most subscriptions (469) expire on week 2 of 2019
+
 SELECT
     TO_CHAR(expiration_date, 'yyyy') year_num,
     TO_CHAR(expiration_date, 'W') week_num, 
@@ -121,16 +146,23 @@ ORDER BY expiration_count DESC
 LIMIT 1;
 
 -- QUESTION 6: How many new customers have been added on 2018-12-12? How many existing customers renewed their subscriptions on 2018-12-12?
+
+-- assuming old customer appears more than once in fct_subscriptions table
+-- get partition of subscribers
+-- chose ones that are on 2018-12-12  and appeared once in a table - new customer
+-- chose ones that are on 2018-12-12  and appeared more than once in a table - renewal customer
+
 -- ANSWER: On 2018-12-12 there were 3 new customers and 0 customers renewed subscriptions
+
 SELECT
     COUNT(1) new_customers
 FROM (
     SELECT
         *,
-        DENSE_RANK() OVER(PARTITION BY subscriber_id) rank
+        DENSE_RANK() OVER(PARTITION BY subscriber_id) transactions
     FROM fct_subscriptions
     ) f1
-WHERE DATE(effective_date) = '2018-12-12' AND f1.rank = 1;
+WHERE DATE(effective_date) = '2018-12-12' AND f1.transactions = 1;
 
 
 SELECT
@@ -138,12 +170,18 @@ SELECT
 FROM (
     SELECT
         *,
-        DENSE_RANK() OVER(PARTITION BY subscriber_id) rank
+        DENSE_RANK() OVER(PARTITION BY subscriber_id) transactions
     FROM fct_subscriptions
     ) f1
-WHERE DATE(effective_date) = '2018-12-12' AND f1.rank > 1;
+WHERE DATE(effective_date) = '2018-12-12' AND f1.transactions > 1;
 
 -- QUESTION 7: Every week of every year lists the most expensive subscription, its number, segment, and rate.
+
+-- Join tables to have all subscriptions
+-- Ignore NULLs and find maximum rate
+-- Select required fields from subquery expression
+-- use corelated subquery to go line by line and compare rate to maximum rate on week basis
+
 -- ANSWER:
 
 SELECT
@@ -157,7 +195,7 @@ FROM (
         TO_CHAR(DATE(f.effective_date), 'w') week,
         MAX(f.rate) rate, d.product_segment segment
     FROM fct_subscriptions f
-    JOIN dim_priceplans d
+    LEFT JOIN dim_priceplans d
     ON f.soc_pp_code = d.soc_pp_code
     WHERE rate is not NULL
     GROUP BY year_num, week, segment
@@ -171,7 +209,7 @@ WHERE rate = (
             TO_CHAR(DATE(f.effective_date), 'w') week,
             f.rate rate
         FROM fct_subscriptions f
-        JOIN dim_priceplans d
+        LEFT JOIN dim_priceplans d
         ON f.soc_pp_code = d.soc_pp_code) f2
     WHERE f1.week=f2.week);
 
