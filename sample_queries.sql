@@ -134,12 +134,12 @@ WHERE rate > prev_rate
 -- group by both and order
 -- count expiration_dates and order descending to have majority value
 
--- ANSWER: Most subscriptions (469) expire on week 2 of 2019
+-- ANSWER: Most subscriptions (451) expire on week 7 of 2019
 
 SELECT
     TO_CHAR(expiration_date, 'yyyy') year_num,
-    TO_CHAR(expiration_date, 'W') week_num, 
-    COUNT(TO_CHAR(expiration_date, 'W')) expiration_count
+    TO_CHAR(expiration_date, 'ww') week_num, 
+    COUNT(TO_CHAR(expiration_date, 'WW')) expiration_count
 FROM fct_subscriptions
 GROUP BY year_num, week_num
 ORDER BY expiration_count DESC
@@ -184,6 +184,23 @@ WHERE DATE(effective_date) = '2018-12-12' AND f1.transactions > 1;
 
 -- ANSWER:
 
+-- checking if plan  = subscpiption
+
+with data as(
+SELECT 
+   d.soc_pp_code,
+   f.rate,
+   lag(rate) over(partition by d.soc_pp_code order by rate) prev_rate
+FROM fct_subscriptions f
+LEFT JOIN dim_priceplans d
+ON f.soc_pp_code = d.soc_pp_code)
+
+-- select * from data where rate != prev_rate;
+
+select * from data where soc_pp_code = 'PVJA';
+
+-- since plan is not equal to subscription and no subcsription ID is available, I assume subscription = rate, ant 'its number' = week number
+
 SELECT
     f1.rate rate_or_subscription,
     f1.year_num,
@@ -192,21 +209,22 @@ SELECT
 FROM (
     SELECT
         TO_CHAR(DATE(f.effective_date), 'yyyy') year_num,
-        TO_CHAR(DATE(f.effective_date), 'w') week,
-        MAX(f.rate) rate, d.product_segment segment
+        TO_CHAR(DATE(f.effective_date), 'ww') week,
+        MAX(f.rate) rate,
+        d.product_segment segment
     FROM fct_subscriptions f
     LEFT JOIN dim_priceplans d
     ON f.soc_pp_code = d.soc_pp_code
     WHERE rate is not NULL
     GROUP BY year_num, week, segment
-    ORDER BY week
+    ORDER BY year_num, week
     ) f1
 WHERE rate = (
     SELECT
         MAX(rate)
     FROM (
         SELECT
-            TO_CHAR(DATE(f.effective_date), 'w') week,
+            TO_CHAR(DATE(f.effective_date), 'ww') week,
             f.rate rate
         FROM fct_subscriptions f
         LEFT JOIN dim_priceplans d
@@ -214,3 +232,28 @@ WHERE rate = (
     WHERE f1.week=f2.week);
 
 
+-- OPTION: 2 use TEMP TABLE FOR BETTER READABILITY:
+-- create temporary table as join and select needed columns, CTE can not be referenced 2nd time in suquery
+
+DROP TABLE data_table;
+CREATE TEMP TABLE data_table AS
+SELECT 
+    max(rate) rate,
+    TO_CHAR(date(f.effective_date), 'yyyy') year_num,
+    TO_CHAR(date(f.effective_date), 'ww') week,
+    d.product_segment segment
+FROM fct_subscriptions f
+LEFT JOIN dim_priceplans d
+ON f.soc_pp_code = d.soc_pp_code
+GROUP BY year_num, week, segment
+ORDER BY year_num, week;
+
+-- compare max rate/subscription by year and month
+SELECT
+    * 
+FROM data_table a
+WHERE rate = (
+    SELECT
+        MAX(rate)
+    FROM data_table
+    WHERE week = a.week)
