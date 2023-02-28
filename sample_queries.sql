@@ -197,7 +197,10 @@ ON f.soc_pp_code = d.soc_pp_code)
 
 -- select * from data where rate != prev_rate;
 
-select * from data where soc_pp_code = 'PVJA';
+SELECT
+    *
+FROM data
+WHERE soc_pp_code = 'PVJA';
 
 -- since plan is not equal to subscription and no subcsription ID is available, I assume subscription = rate, ant 'its number' = week number
 
